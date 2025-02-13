@@ -2,12 +2,15 @@ import telebot
 import firebase_admin
 from firebase_admin import credentials, db
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+import os
+
 
 
 
 
 # Загрузка токенов
-BOT_TOKEN = "7047755384:AAHrX_-Ca7iRs0IQnyJ9T2ft4dD7yFz-yDo"
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # Подключение к Firebase
