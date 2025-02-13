@@ -2,6 +2,11 @@ import telebot
 import firebase_admin
 from firebase_admin import credentials, db
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+import threading
+
+
+def run_bot():
+    bot.infinity_polling()
 
 # Загрузка токенов
 BOT_TOKEN = "7047755384:AAHrX_-Ca7iRs0IQnyJ9T2ft4dD7yFz-yDo"
@@ -184,5 +189,7 @@ def send_valentine(message):
     user_id = message.chat.id
     send_search_button(user_id)
 
+
 if __name__ == "__main__":
-    bot.infinity_polling()
+    thread = threading.Thread(target=run_bot)
+    thread.start()
