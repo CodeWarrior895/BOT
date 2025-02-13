@@ -4,7 +4,12 @@ from firebase_admin import credentials, db
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 import os
 
+
+
+
+
 # Загрузка токенов
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -54,15 +59,16 @@ def get_class(message):
 
 def validate_class_letter(message):
     user_id = message.chat.id
-    class_letter = message.text.strip().upper()
+    class_letter = message.text.strip()
     if len(class_letter) == 1 and class_letter.isalpha():
-        user_data[user_id]['class_letter'] = class_letter
+        user_data[user_id]['class_letter'] = class_letter.upper()
         save_user(user_id, user_data[user_id])
         bot.send_message(user_id, "✅ Спасибо! Я записал твои данные.", reply_markup=ReplyKeyboardRemove())
         send_search_button(user_id)
     else:
         bot.send_message(user_id, "❌ Ошибка: Введите только одну букву.")
         bot.register_next_step_handler(message, validate_class_letter)
+
 
 def save_user(user_id, data):
     ref = db.reference("users")
@@ -78,10 +84,46 @@ def send_search_button(user_id):
     markup.add(KeyboardButton("🔍 Найти пользователя"))
     markup.add(KeyboardButton("⚠ Отправить жалобу"))
 
-    if str(user_id) == "1413003857":
+    if(str(user_id) == "1413003857"):
         markup.add(KeyboardButton("Blacklist"))
     
     bot.send_message(user_id, "Что хочешь сделать дальше?", reply_markup=markup)
+
+# Функция отправки жалоб
+@bot.message_handler(func=lambda message: message.text == "⚠ Отправить жалобу")
+def ask_for_complaint(message):
+    bot.send_message(message.chat.id, "Опишите вашу жалобу:")
+    bot.register_next_step_handler(message, save_complaint)
+
+
+@bot.message_handler(func=lambda message: message.text == "Blacklist")
+def blacklist(message):
+    bot.send_message(message.chat.id, "Blacklist the user:")
+    bot.register_next_step_handler(message, blacklist_user)
+
+def blacklist_user(message):
+    user_id = message.text.strip()
+    ref = db.reference("blacklist")
+    ref.child(str(user_id)).set(True)
+    blacklist_session.add(user_id)
+    bot.send_message(message.chat.id, f"✅ Пользователь {user_id} добавлен в черный список.")
+    user_id = message.chat.id
+    send_search_button(user_id)
+
+    
+
+def save_complaint(message):
+    user_id = message.chat.id
+    complaint_text = message.text
+    complaints_ref = db.reference("complaints")
+    complaints_ref.push({
+        "user_id": user_id,
+        "complaint": complaint_text
+    })
+    bot.send_message(user_id, "✅ Ваша жалоба отправлена.")
+
+    user_id = message.chat.id
+    send_search_button(user_id)
 
 @bot.message_handler(func=lambda message: message.text == "🔍 Найти пользователя")
 def ask_for_class(message):
@@ -102,20 +144,53 @@ def search_users_by_class(message):
 
     users_ref = db.reference("users").get()
     if users_ref:
-        matching_users = [
-            (uid, user_info) for uid, user_info in users_ref.items()
-            if user_info.get("class") == class_num and user_info.get("class_letter", "").upper() == class_letter
-        ]
+        matching_users = []
+        for uid, user_info in users_ref.items():
+            if user_info.get("class") == class_num and user_info.get("class_letter").upper() == class_letter:
+                matching_users.append((uid, user_info))
+
         if matching_users:
             markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
             for uid, user_info in matching_users:
-                markup.add(KeyboardButton(f"{user_info['name']} {user_info['surname']} ({uid})"))
+                button = KeyboardButton(f"{user_info['name']} {user_info['surname']} ({uid})")
+                markup.add(button)
             bot.send_message(user_id, "Выберите пользователя:", reply_markup=markup)
             bot.register_next_step_handler(message, ask_for_valentine)
         else:
             bot.send_message(user_id, "❌ Пользователи этого класса не найдены.")
     else:
         bot.send_message(user_id, "База данных пока пустая.")
+
+
+
+
+def ask_for_valentine(message):
+    selected_text = message.text
+    user_id = message.chat.id
+    selected_uid = selected_text.split(" (")[1].rstrip(")") if " (" in selected_text else None
+    
+    if selected_uid:
+        user_data[user_id]['recipient_id'] = selected_uid
+        bot.send_message(user_id, "✍ Напишите вашу валентинку:")
+        bot.register_next_step_handler(message, send_valentine)
+    else:
+        bot.send_message(user_id, "❌ Ошибка: Некорректный выбор пользователя.")
+
+def send_valentine(message):
+    user_id = message.chat.id
+    recipient_id = user_data[user_id].get('recipient_id')
+    valentine_text = message.text
+    
+    if recipient_id:
+        bot.send_message(int(recipient_id), "❤️❤️ Вам пришла анонимная валентинка: ❤️❤️")
+        bot.send_message(int(recipient_id), valentine_text)
+        bot.send_message(user_id, "✅ Валентинка отправлена анонимно!")
+    else:
+        bot.send_message(user_id, "❌ Ошибка: Получатель не найден.")
+    
+    user_id = message.chat.id
+    send_search_button(user_id)
+
 
 if __name__ == "__main__":
     bot.infinity_polling()
