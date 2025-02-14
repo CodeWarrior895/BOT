@@ -13,7 +13,7 @@ import os
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
-cred = credentials.Certificate("serviceAccountKey.json")
+cred = credentials.Certificate("./serviceAccountKey.json")
 firebase_admin.initialize_app(cred, {
     'databaseURL': "https://valentine-a2e19-default-rtdb.firebaseio.com/"
 })
