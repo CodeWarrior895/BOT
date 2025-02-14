@@ -92,6 +92,8 @@ def send_search_button(user_id):
 # Функция отправки жалоб
 @bot.message_handler(func=lambda message: message.text == "⚠ Отправить жалобу")
 def ask_for_complaint(message):
+    
+    user_id = message.chat.id
     if is_blacklisted(user_id):
         bot.send_message(user_id, "❌ Вам запрещено использовать этого бота.")
         return
@@ -140,10 +142,11 @@ def ask_for_class_letter(message):
     bot.register_next_step_handler(message, search_users_by_class)
 
 def search_users_by_class(message):
+    user_id = message.chat.id
+    
     if is_blacklisted(user_id):
         bot.send_message(user_id, "❌ Вам запрещено использовать этого бота.")
         return
-    user_id = message.chat.id
     user_data[user_id]['class_letter'] = message.text.strip().upper()
     class_num = user_data[user_id]['class']
     class_letter = user_data[user_id]['class_letter']
