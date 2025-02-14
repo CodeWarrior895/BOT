@@ -282,6 +282,5 @@ def send_valentine(message):
     send_search_button(user_id)
 
 
-keep_alive()
 if __name__ == "__main__":
     bot.infinity_polling()
