@@ -8,6 +8,7 @@ import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
+bot.set_webhook()
 
 cred = credentials.Certificate("./serviceAccountKey.json")
 firebase_admin.initialize_app(
