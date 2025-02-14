@@ -283,4 +283,6 @@ def send_valentine(message):
 
 
 if __name__ == "__main__":
-    bot.infinity_polling()
+    bot.delete_webhook(drop_pending_updates=True)
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+
