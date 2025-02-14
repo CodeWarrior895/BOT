@@ -93,10 +93,6 @@ def send_search_button(user_id):
 @bot.message_handler(func=lambda message: message.text == "⚠ Отправить жалобу")
 def ask_for_complaint(message):
     
-    user_id = message.chat.id
-    if is_blacklisted(user_id):
-        bot.send_message(user_id, "❌ Вам запрещено использовать этого бота.")
-        return
     bot.send_message(message.chat.id, "Опишите вашу жалобу:")
     bot.register_next_step_handler(message, save_complaint)
 
@@ -119,6 +115,10 @@ def blacklist_user(message):
 
 def save_complaint(message):
     user_id = message.chat.id
+    
+    if is_blacklisted(user_id):
+        bot.send_message(user_id, "❌ Вам запрещено использовать этого бота.")
+        return
     complaint_text = message.text
     complaints_ref = db.reference("complaints")
     complaints_ref.push({
