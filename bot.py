@@ -3,7 +3,6 @@ import firebase_admin
 from firebase_admin import credentials, db
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 import os
-from background import keep_alive
 
 # Загрузка токенов
 
