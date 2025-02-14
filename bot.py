@@ -22,7 +22,13 @@ firebase_admin.initialize_app(cred, {
 user_data = {}
 blacklist_session = set()
 
-RULES = "\nПравила использования:\n1) Не выставлять себя за других\n2) Не писать гадости, а только любовные записки\n3) Не использовать бота для других целей\n"
+RULES = """\n📜 *Правила использования:*  
+1️⃣ Не выставлять себя за других.  
+2️⃣ Не писать гадости, а только любовные записки.  
+3️⃣ Не использовать бота для других целей.  
+4️⃣ Каждый пользователь должен указывать свои **настоящие и верные данные**, чтобы отправитель смог его найти.  
+"""
+
 
 def is_blacklisted(user_id):
     blacklist_ref = db.reference("blacklist").get()
@@ -41,21 +47,44 @@ def start(message):
 
 def get_name(message):
     user_id = message.chat.id
-    user_data[user_id]['name'] = message.text
+    name = message.text.strip()
+
+    if " " in name:
+        bot.send_message(user_id, "❌ Ошибка: Имя не должно содержать пробелов. Введите корректное имя:")
+        bot.register_next_step_handler(message, get_name)
+        return
+
+    user_data[user_id]['name'] = name
     bot.send_message(user_id, "Какая у тебя фамилия?")
     bot.register_next_step_handler(message, get_surname)
 
 def get_surname(message):
     user_id = message.chat.id
-    user_data[user_id]['surname'] = message.text
+    surname = message.text.strip()
+
+    if " " in surname:
+        bot.send_message(user_id, "❌ Ошибка: Фамилия не должна содержать пробелов. Введите корректную фамилию:")
+        bot.register_next_step_handler(message, get_surname)
+        return
+
+    user_data[user_id]['surname'] = surname
     bot.send_message(user_id, "Какой у тебя класс? (например: 10)")
     bot.register_next_step_handler(message, get_class)
 
+
 def get_class(message):
     user_id = message.chat.id
-    user_data[user_id]['class'] = message.text
+    class_num = message.text.strip()
+
+    if not class_num.isdigit():
+        bot.send_message(user_id, "❌ Ошибка: Введите только номер класса (например: 10).")
+        bot.register_next_step_handler(message, get_class)
+        return
+
+    user_data[user_id]['class'] = class_num
     bot.send_message(user_id, "Какая буква у твоего класса? (одна буква, например: А)")
     bot.register_next_step_handler(message, validate_class_letter)
+
 
 def validate_class_letter(message):
     user_id = message.chat.id
@@ -92,9 +121,14 @@ def send_search_button(user_id):
 # Функция отправки жалоб
 @bot.message_handler(func=lambda message: message.text == "⚠ Отправить жалобу")
 def ask_for_complaint(message):
-    
-    bot.send_message(message.chat.id, "Опишите вашу жалобу:")
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add(KeyboardButton("❌ Отменить"))
+    bot.send_message(message.chat.id, "Опишите вашу жалобу:", reply_markup=markup)
     bot.register_next_step_handler(message, save_complaint)
+
+@bot.message_handler(func=lambda message: message.text == "❌ Отменить")
+def cancel_action(message):
+    send_search_button(message.chat.id)
 
 
 @bot.message_handler(func=lambda message: message.text == "Blacklist")
@@ -114,11 +148,15 @@ def blacklist_user(message):
     
 
 def save_complaint(message):
+    if message.text == "❌ Отменить":
+        send_search_button(message.chat.id)
+        return
+
     user_id = message.chat.id
-    
     if is_blacklisted(user_id):
         bot.send_message(user_id, "❌ Вам запрещено использовать этого бота.")
         return
+
     complaint_text = message.text
     complaints_ref = db.reference("complaints")
     complaints_ref.push({
@@ -126,14 +164,16 @@ def save_complaint(message):
         "complaint": complaint_text
     })
     bot.send_message(user_id, "✅ Ваша жалоба отправлена.")
-
-    user_id = message.chat.id
     send_search_button(user_id)
 
 @bot.message_handler(func=lambda message: message.text == "🔍 Найти пользователя")
 def ask_for_class(message):
     bot.send_message(message.chat.id, "Введите номер класса (например: 10):")
     bot.register_next_step_handler(message, ask_for_class_letter)
+
+@bot.message_handler(func=lambda message: message.text == "❌ Отменить")
+def cancel_search(message):
+    send_search_button(message.chat.id)
 
 def ask_for_class_letter(message):
     user_id = message.chat.id
@@ -142,11 +182,11 @@ def ask_for_class_letter(message):
     bot.register_next_step_handler(message, search_users_by_class)
 
 def search_users_by_class(message):
-    user_id = message.chat.id
-    
-    if is_blacklisted(user_id):
-        bot.send_message(user_id, "❌ Вам запрещено использовать этого бота.")
+    if message.text == "❌ Отменить":
+        send_search_button(message.chat.id)
         return
+    
+    user_id = message.chat.id
     user_data[user_id]['class_letter'] = message.text.strip().upper()
     class_num = user_data[user_id]['class']
     class_letter = user_data[user_id]['class_letter']
@@ -160,6 +200,7 @@ def search_users_by_class(message):
 
         if matching_users:
             markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+            markup.add(KeyboardButton("❌ Отменить"))
             for uid, user_info in matching_users:
                 button = KeyboardButton(f"{user_info['name']} {user_info['surname']} ({uid})")
                 markup.add(button)
@@ -167,13 +208,16 @@ def search_users_by_class(message):
             bot.register_next_step_handler(message, ask_for_valentine)
         else:
             bot.send_message(user_id, "❌ Пользователи этого класса не найдены.")
+            send_search_button(user_id)
     else:
         bot.send_message(user_id, "База данных пока пустая.")
-
-
-
+        send_search_button(user_id)
 
 def ask_for_valentine(message):
+    if message.text == "❌ Отменить":
+        send_search_button(message.chat.id)
+        return
+
     selected_text = message.text
     user_id = message.chat.id
     selected_uid = selected_text.split(" (")[1].rstrip(")") if " (" in selected_text else None
@@ -184,6 +228,7 @@ def ask_for_valentine(message):
         bot.register_next_step_handler(message, send_valentine)
     else:
         bot.send_message(user_id, "❌ Ошибка: Некорректный выбор пользователя.")
+        send_search_button(user_id)
 
 def send_valentine(message):
     user_id = message.chat.id
@@ -191,7 +236,7 @@ def send_valentine(message):
     valentine_text = message.text
     
     if recipient_id:
-        bot.send_message(int(recipient_id), "❤️❤️ Вам пришла анонимная валентинка: ❤️❤️")
+        bot.send_message(int(recipient_id), """💌✨ Вам пришла **анонимная валентинка**! ✨💌""")
         bot.send_message(int(recipient_id), valentine_text)
         bot.send_message(user_id, "✅ Валентинка отправлена анонимно!")
     else:
